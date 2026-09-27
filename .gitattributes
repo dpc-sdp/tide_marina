@@ -1,0 +1,4 @@
+# linguist configuration for syntax highlighting in github UI.
+*.module linguist-language=PHP
+*.install linguist-language=PHP
+*.theme linguist-language=PHP

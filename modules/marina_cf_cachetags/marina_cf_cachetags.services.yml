@@ -1,0 +1,15 @@
+services:
+  _defaults:
+    autowire: true
+
+  marina_cf_cachetags.cache_tags_hash:
+    class: Drupal\marina_cf_cachetags\CacheTagsHash
+  Drupal\marina_cf_cachetags\CacheTagsHashInterface: '@marina_cf_cachetags.cache_tags_hash'
+
+  marina_cf_cachetags.cache_tag_filter:
+    class: Drupal\marina_cf_cachetags\DefaultCacheTagFilter
+  Drupal\marina_cf_cachetags\CacheTagFilterInterface: '@marina_cf_cachetags.cache_tag_filter'
+
+  marina_cf_cachetags.cache_tag_prioritizer:
+    class: Drupal\marina_cf_cachetags\DefaultCacheTagPrioritizer
+  Drupal\marina_cf_cachetags\CacheTagPrioritizerInterface: '@marina_cf_cachetags.cache_tag_prioritizer'

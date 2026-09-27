@@ -1,0 +1,63 @@
+<?php
+
+/**
+ * @file
+ * Install, update, and uninstall functions for the tide_marina module.
+ */
+
+
+/**
+ * Implements hook_install().
+ */
+function tide_marina_install() {
+  _tide_marina_switch_to_cloudfront();
+  _tide_marina_empty_purge_queue();
+}
+
+/**
+ * Migrate cache purging configuration from Section.io to Marina CloudFront.
+ */
+function _tide_marina_switch_to_cloudfront() {
+  $module_installer = \Drupal::service('module_installer');
+
+  // Install Marina CloudFront cache tags module if not enabled.
+  if (!\Drupal::moduleHandler()->moduleExists('marina_cf_cachetags')) {
+    $module_installer->install(['marina_cf_cachetags']);
+  }
+
+  $config_factory = \Drupal::configFactory();
+
+  // Remove the legacy Section.io purger from Purge's plugin configuration.
+  $purge_plugins = $config_factory->getEditable('purge.plugins');
+  $purgers = $purge_plugins->get('purgers') ?? [];
+  $purgers = array_values(array_filter($purgers, static function (array $purger) {
+    return !in_array($purger['plugin_id'] ?? NULL, ['section', 'sectionbundled'], TRUE);
+  }));
+  $purge_plugins->set('purgers', $purgers)->save();
+
+  // Remove the logger channel associated with the legacy Section.io purger.
+  $logger_config = $config_factory->getEditable('purge.logger_channels');
+  $channels = $logger_config->get('channels') ?? [];
+  $channels = array_values(array_filter($channels, static function (array $channel) {
+    return !str_starts_with($channel['id'] ?? '', 'purger_section');
+  }));
+  $logger_config->set('channels', $channels)->save();
+
+  // Remove configuration and credentials that are no longer used.
+  $config_factory->getEditable('section_purge.settings.8714ff77fc')->delete();
+  $config_factory->getEditable('key.key.section_io_password')->delete();
+
+  // Uninstall legacy Section Purge module if present.
+  if (\Drupal::moduleHandler()->moduleExists('section_purge')) {
+    $module_installer->uninstall(['section_purge']);
+  }
+}
+
+/**
+ * Empty the purge queue to clear stale Section.io items.
+ */
+function _tide_marina_empty_purge_queue() {
+  if (\Drupal::hasService('purge.queue')) {
+    \Drupal::service('purge.queue')->emptyQueue();
+  }
+}

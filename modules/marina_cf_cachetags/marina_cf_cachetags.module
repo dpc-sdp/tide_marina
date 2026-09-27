@@ -1,0 +1,47 @@
+<?php
+
+/**
+ * @file
+ * Marina CloudFront cache tags integration.
+ */
+
+use Drupal\Core\Render\BubbleableMetadata;
+use Drupal\marina_cf_cachetags\InvalidationTokens;
+
+/**
+ * Implements hook_tokens_alter().
+ *
+ * The purge_tokens module builds `[invalidations:separated_comma]` from each
+ * invalidation's raw expression (e.g. `node:203`). We replace it with the
+ * xxHash3 hash of each tag — the same value emitted in the
+ * `x-amz-meta-cache-tag` response header — which the cache invalidation API
+ * normalises into a CloudFront cache tag.
+ *
+ * The replacement is rebuilt unconditionally because purge_tokens_tokens()
+ * checks `$data['invalidations'][0]` and produces nothing when the batch
+ * offered by PurgersService is not indexed from 0 (which happens whenever the
+ * queue holds an item of a type this purger does not support).
+ */
+function marina_cf_cachetags_tokens_alter(array &$replacements, array $context, BubbleableMetadata $bubbleable_metadata) {
+  if (($context['type'] ?? NULL) !== 'invalidations') {
+    return;
+  }
+  $invalidations = $context['data']['invalidations'] ?? [];
+  if (!$invalidations) {
+    return;
+  }
+
+  $expressions = InvalidationTokens::hashedTagExpressions(
+    $invalidations,
+    \Drupal::service('marina_cf_cachetags.cache_tags_hash')
+  );
+  if (!$expressions) {
+    return;
+  }
+
+  foreach ($context['tokens'] as $name => $original) {
+    if (isset(InvalidationTokens::SEPARATORS[$name])) {
+      $replacements[$original] = implode(InvalidationTokens::SEPARATORS[$name], $expressions);
+    }
+  }
+}

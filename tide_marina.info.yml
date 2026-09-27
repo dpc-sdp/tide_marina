@@ -1,0 +1,9 @@
+name: tide_marina
+type: module
+description: Drupal integrations and dependency management for the Tide Marina.
+package: Tide Marina
+core_version_requirement: ^10.2 || ^11
+dependencies:
+  - drupal:redis
+  - purge:purge
+  - purge_purger_http:purge_purger_http

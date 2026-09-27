@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<ruleset name="Tide Marina">
+  <description>Drupal coding standards for this module.</description>
+
+  <rule ref="Drupal"/>
+  <rule ref="DrupalPractice"/>
+
+  <file>.</file>
+
+  <arg name="extensions" value="php,module,inc,install,test,profile,theme,css,info,txt,md,yml"/>
+
+  <exclude-pattern>*/vendor/*</exclude-pattern>
+  <exclude-pattern>*/node_modules/*</exclude-pattern>
+</ruleset>

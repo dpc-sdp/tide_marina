@@ -1,0 +1,18 @@
+{
+  "name": "dpc-sdp/tide-marina-tools",
+  "description": "Development tooling for Tide Marina.",
+  "type": "project",
+  "license": "GPL-2.0-or-later",
+  "require-dev": {
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.2",
+    "drupal/coder": "^8.3",
+    "slevomat/coding-standard": "^8.22",
+    "squizlabs/php_codesniffer": "^3.13"
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    },
+    "sort-packages": true
+  }
+}

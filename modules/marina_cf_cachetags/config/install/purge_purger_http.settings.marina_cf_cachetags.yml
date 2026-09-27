@@ -1,0 +1,20 @@
+id: marina_cf_cachetags
+label: 'Marina CloudFront'
+name: 'Marina CloudFront cache invalidation'
+invalidationtype: tag
+hostname: localhost
+port: 8083
+# Override this in settings.php with the deployment's project and environment.
+path: /prod/cache-invalidation/{project}/{environment}
+request_method: POST
+scheme: http
+verify: true
+headers: { }
+body: '{"tagsCsv":"[invalidations:separated_comma]"}'
+body_content_type: application/json
+runtime_measurement: true
+timeout: 1.0
+connect_timeout: 1.0
+cooldown_time: 0.0
+max_requests: 100
+http_errors: true

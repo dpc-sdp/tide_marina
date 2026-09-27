@@ -1,0 +1,136 @@
+<?php
+
+/**
+ * @file
+ * Installs and uninstalls the Marina CloudFront cache tags integration.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function marina_cf_cachetags_install() {
+  marina_cf_cachetags_configure_purge();
+}
+
+/**
+ * Configure the purger, queuer, and processor used by the integration.
+ */
+function marina_cf_cachetags_configure_purge() {
+  $config = \Drupal::configFactory()->getEditable('purge.plugins');
+
+  // Register the bundled HTTP purger so Purge sends tags to the sidecar.
+  $purgers = $config->get('purgers') ?? [];
+  $purger_exists = FALSE;
+  foreach ($purgers as &$purger) {
+    if (($purger['instance_id'] ?? NULL) === 'marina_cf_cachetags') {
+      $purger['plugin_id'] = 'httpbundled';
+      $purger_exists = TRUE;
+      break;
+    }
+  }
+  unset($purger);
+  if (empty($purger_exists)) {
+    $purgers[] = [
+      'order_index' => 3,
+      'instance_id' => 'marina_cf_cachetags',
+      'plugin_id' => 'httpbundled',
+    ];
+  }
+  $config->set('purgers', $purgers);
+
+  // Queue cache tags invalidated by Drupal core and contributed modules.
+  $queuers = $config->get('queuers') ?? [];
+  $coretags_exists = FALSE;
+  foreach ($queuers as &$queuer) {
+    if (($queuer['plugin_id'] ?? NULL) === 'coretags') {
+      $queuer['status'] = TRUE;
+      $coretags_exists = TRUE;
+      break;
+    }
+  }
+  unset($queuer);
+  if (empty($coretags_exists)) {
+    $queuers[] = [
+      'plugin_id' => 'coretags',
+      'status' => TRUE,
+    ];
+  }
+  $config->set('queuers', $queuers);
+
+  // Process pending invalidations after the response has been sent.
+  $processors = $config->get('processors') ?? [];
+  $lateruntime_exists = FALSE;
+  foreach ($processors as &$processor) {
+    if (($processor['plugin_id'] ?? NULL) === 'lateruntime') {
+      $processor['status'] = TRUE;
+      $lateruntime_exists = TRUE;
+      break;
+    }
+  }
+  unset($processor);
+  if (empty($lateruntime_exists)) {
+    $processors[] = [
+      'plugin_id' => 'lateruntime',
+      'status' => TRUE,
+    ];
+  }
+  $config->set('processors', $processors)->save();
+
+  // Log failures from the HTTP bundled purger.
+  $logger_config = \Drupal::configFactory()
+    ->getEditable('purge.logger_channels');
+  $channels = $logger_config->get('channels') ?? [];
+  $channel_id = 'purger_httpbundled_marina_cf_cachetags';
+  $channel_exists = FALSE;
+  foreach ($channels as $channel) {
+    if (($channel['id'] ?? NULL) === $channel_id) {
+      $channel_exists = TRUE;
+      break;
+    }
+  }
+  if (empty($channel_exists)) {
+    $channels[] = [
+      'id' => $channel_id,
+      'grants' => [0, 2, 3],
+    ];
+    $logger_config->set('channels', $channels)->save();
+  }
+}
+
+/**
+ * Install the correctly named HTTP purger config on existing sites.
+ */
+function marina_cf_cachetags_update_10001() {
+  $config_factory = \Drupal::configFactory();
+  $config_name = 'purge_purger_http.settings.marina_cf_cachetags';
+
+  if ($config_factory->get($config_name)->isNew()) {
+    \Drupal::service('config.installer')
+      ->installDefaultConfig('module', 'marina_cf_cachetags');
+  }
+
+  marina_cf_cachetags_configure_purge();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function marina_cf_cachetags_uninstall() {
+  $config_factory = \Drupal::configFactory();
+  $config = $config_factory->getEditable('purge.plugins');
+  $purgers = $config->get('purgers') ?? [];
+
+  // Avoid leaving Purge with a reference to this module's deleted settings.
+  $purgers = array_values(array_filter($purgers, static function (array $purger) {
+    return ($purger['instance_id'] ?? NULL) !== 'marina_cf_cachetags';
+  }));
+
+  $config->set('purgers', $purgers)->save();
+
+  $logger_config = $config_factory->getEditable('purge.logger_channels');
+  $channels = $logger_config->get('channels') ?? [];
+  $channels = array_values(array_filter($channels, static function (array $channel) {
+    return ($channel['id'] ?? NULL) !== 'purger_httpbundled_marina_cf_cachetags';
+  }));
+  $logger_config->set('channels', $channels)->save();
+}
