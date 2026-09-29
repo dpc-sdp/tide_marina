@@ -33,20 +33,22 @@ class InvalidationTokensTest extends UnitTestCase {
     $this->assertSame([], InvalidationTokens::hashedTagExpressions([], $hash));
 
     $expressions = InvalidationTokens::hashedTagExpressions([
-      // Sparse keys, as handed over by PurgersService. Only tag invalidations
-      // are hashed; url items, empty expressions and non-invalidations are
-      // skipped, and duplicates are removed with order preserved.
+      // Sparse keys, as handed over by PurgersService.
       3 => $this->invalidation('tag', 'node:203'),
       4 => $this->invalidation('url', 'http://example.com/'),
       5 => $this->invalidation('tag', 'node:203'),
-      6 => $this->invalidation('tag', ''),
-      7 => 'not an invalidation',
-      8 => $this->invalidation('tag', 'config:system.site'),
+      6 => $this->invalidation('tag', '#already'),
+      7 => $this->invalidation('tag', 'tag:pre'),
+      8 => $this->invalidation('tag', ''),
+      9 => 'not an invalidation',
+      10 => $this->invalidation('tag', 'config:system.site'),
     ], $hash);
 
     $this->assertSame([
-      $hash->hashTag('node:203'),
-      $hash->hashTag('config:system.site'),
+      'tag:' . $hash->hashTag('node:203'),
+      '#already',
+      'tag:pre',
+      'tag:' . $hash->hashTag('config:system.site'),
     ], $expressions);
   }
 
