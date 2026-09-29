@@ -12,15 +12,28 @@ use Drupal\marina_cf_cachetags\InvalidationTokens;
  * Implements hook_tokens_alter().
  *
  * The purge_tokens module builds `[invalidations:separated_comma]` from each
- * invalidation's raw expression (e.g. `node:203`). We replace it with the
- * xxHash3 hash of each tag — the same value emitted in the
- * `x-amz-meta-cache-tag` response header — which the cache invalidation API
- * normalises into a CloudFront cache tag.
+ * invalidation's raw expression, so a tag invalidation contributes the bare
+ * Drupal cache tag, e.g. `node:203`. The cache invalidation API normalises
+ * what it receives before publishing it to EventBridge (marina,
+ * src/infra/constructs/cache-invalidation/publisher.ts):
  *
- * The replacement is rebuilt unconditionally because purge_tokens_tokens()
- * checks `$data['invalidations'][0]` and produces nothing when the batch
- * offered by PurgersService is not indexed from 0 (which happens whenever the
- * queue holds an item of a type this purger does not support).
+ *   - `tag:<x>` becomes `#<x>` (a CloudFront cache tag)
+ *   - starts with `/`, `#`, or contains `:`: passes through unchanged
+ *   - anything else gets a leading `/` (a CloudFront path)
+ *
+ * A bare `node:203` contains a colon, so it would pass through untouched and
+ * reach CloudFront's CreateInvalidation as a literal path. Prefixing the
+ * hashed expression with `tag:` routes it into the first branch, so it
+ * arrives as `#<hash>` and matches the values CloudFront indexed from the
+ * `x-amz-meta-cache-tag` response header, which uses the same hash service.
+ *
+ * The replacement is always rebuilt here rather than only adjusted, because
+ * purge_tokens_tokens() checks `$data['invalidations'][0]` and silently
+ * produces nothing when the offered batch does not start at index 0. That is
+ * the normal case whenever the queue holds an item of a type this purger does
+ * not support: PurgersService groups by original key, so the supported items
+ * arrive with sparse keys and the request body would go out with the literal
+ * token in it.
  */
 function marina_cf_cachetags_tokens_alter(array &$replacements, array $context, BubbleableMetadata $bubbleable_metadata) {
   if (($context['type'] ?? NULL) !== 'invalidations') {
