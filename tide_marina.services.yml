@@ -1,0 +1,30 @@
+# Route all Drupal logs to the container output as JSON.
+#
+# Web requests write JSON to stdout, which PHP-FPM forwards to the container
+# log (catch_workers_output). Drush also writes JSON, but to stderr, so command
+# output on stdout stays clean and Batch API commands do not break.
+#
+# These parameters override the defaults in monolog.services.yml. A site can
+# still override them in a container_yamls file loaded from settings.php.
+parameters:
+  tide_marina.log_level: 'info'
+  monolog.channel_handlers:
+    default:
+      handlers:
+        - name: 'tide_marina_output'
+          formatter: 'json'
+
+services:
+  monolog.handler.tide_marina_output:
+    class: Drupal\monolog\Logger\Handler\ConditionalHandler
+    arguments:
+      - '@monolog.handler.tide_marina_stderr'
+      - '@monolog.handler.tide_marina_stdout'
+      - '@monolog.condition_resolver.cli'
+      - '%tide_marina.log_level%'
+  monolog.handler.tide_marina_stdout:
+    class: Monolog\Handler\StreamHandler
+    arguments: ['php://stdout']
+  monolog.handler.tide_marina_stderr:
+    class: Monolog\Handler\StreamHandler
+    arguments: ['php://stderr']
