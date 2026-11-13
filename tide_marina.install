@@ -5,13 +5,13 @@
  * Install, update, and uninstall functions for the tide_marina module.
  */
 
-
 /**
  * Implements hook_install().
  */
 function tide_marina_install() {
   _tide_marina_switch_to_cloudfront();
   _tide_marina_empty_purge_queue();
+  _tide_marina_log_monolog_enabled();
 }
 
 /**
@@ -51,6 +51,23 @@ function _tide_marina_switch_to_cloudfront() {
   if (\Drupal::moduleHandler()->moduleExists('section_purge')) {
     $module_installer->uninstall(['section_purge']);
   }
+}
+
+/**
+ * Enable Monolog to send logs to the container output as JSON.
+ */
+function tide_marina_update_10001() {
+  if (!\Drupal::moduleHandler()->moduleExists('monolog')) {
+    \Drupal::service('module_installer')->install(['monolog']);
+  }
+  _tide_marina_log_monolog_enabled();
+}
+
+/**
+ * Log a marker so JSON log collection can be verified after deployment.
+ */
+function _tide_marina_log_monolog_enabled() {
+  \Drupal::logger('tide_marina')->info('Tide Marina: Monolog JSON logging enabled.');
 }
 
 /**

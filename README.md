@@ -38,6 +38,32 @@ tools/vendor/bin/phpcs --standard=phpcs.xml.dist
   responses' Drupal cache tags in the `x-amz-meta-cache-tag` header and
   invalidates those tags through the local CloudFront SigV4 sidecar.
 - Automatically handles migration tasks from legacy Section.io purgers to the Marina CloudFront integration upon module installation (tide_marina_install()).
+- Sends Drupal logs to the container output as JSON through [Monolog](https://www.drupal.org/project/monolog).
+
+### Logging
+
+`tide_marina` requires and enables `monolog` (existing sites get it through
+`tide_marina_update_10001()`). Install and the update hook both log
+`Tide Marina: Monolog JSON logging enabled.` on the `tide_marina` channel, so
+log collection can be checked after deployment. Monolog replaces Drupal's
+logger factory, so
+every channel goes to the `tide_marina_output` handler defined in
+`tide_marina.services.yml`:
+
+- Web requests write JSON to `php://stdout`. PHP-FPM forwards it to the
+  container log when `catch_workers_output` is enabled.
+- Drush also writes JSON, but to `php://stderr`, so command output on stdout
+  stays clean and Batch API commands keep working.
+
+Other Drupal loggers (`dblog`, `syslog`, `lagoon_logs`, `tide_logs`) no longer
+receive records unless they are added as handlers. The minimum level defaults
+to `info`. To change it, or to change the handlers, override the parameters in
+a site `services.yml`:
+
+```yaml
+parameters:
+  tide_marina.log_level: 'warning'
+```
 
 ### CloudFront cache tags
 
