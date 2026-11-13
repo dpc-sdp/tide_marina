@@ -5,7 +5,6 @@
  * Install, update, and uninstall functions for the tide_marina module.
  */
 
-
 /**
  * Implements hook_install().
  */
