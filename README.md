@@ -47,8 +47,9 @@ tools/vendor/bin/phpcs --standard=phpcs.xml.dist
 `Tide Marina: Monolog JSON logging enabled.` on the `tide_marina` channel, so
 log collection can be checked after deployment. Monolog replaces Drupal's
 logger factory, so
-every channel goes to the `tide_marina_output` handler defined in
-`tide_marina.services.yml`:
+every channel goes to the `tide_marina_output` handler. The handler is
+registered by `TideMarinaServiceProvider` only when Monolog is enabled, so the
+container can still be rebuilt before the update hook runs:
 
 - Web requests write JSON to `php://stdout`. PHP-FPM forwards it to the
   container log when `catch_workers_output` is enabled.
