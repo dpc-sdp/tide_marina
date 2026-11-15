@@ -13,6 +13,12 @@
     "ext-zip": "*",
     "ext-zlib": "*"
   },
+  "config": {
+    "allow-plugins": {
+      "drupal/core-composer-scaffold": false,
+      "symfony/runtime": false
+    }
+  },
   "extra": {
     "composer-exit-on-patch-failure": true,
     "enable-patching": true
