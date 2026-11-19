@@ -9,6 +9,18 @@
  * Implements hook_install().
  */
 function tide_marina_install() {
+  // Remove the legacy platform modules before Section Purge is uninstalled,
+  // so uninstalling section_purge does not cascade to its Bay dependents.
+  // A failure here must not leave tide_marina half installed, and update
+  // hooks do not run for a freshly installed module, so log and continue.
+  try {
+    _tide_marina_uninstall_legacy_platform_modules();
+  }
+  catch (\Throwable $e) {
+    \Drupal::logger('tide_marina')->error('Tide Marina: legacy platform module clean-up failed: @message', [
+      '@message' => $e->getMessage(),
+    ]);
+  }
   _tide_marina_switch_to_cloudfront();
   _tide_marina_empty_purge_queue();
   _tide_marina_log_monolog_enabled();
@@ -47,9 +59,15 @@ function _tide_marina_switch_to_cloudfront() {
   $config_factory->getEditable('section_purge.settings.8714ff77fc')->delete();
   $config_factory->getEditable('key.key.section_io_password')->delete();
 
-  // Uninstall legacy Section Purge module if present.
+  // Uninstall legacy Section Purge module if present. Dependents are not
+  // uninstalled with it: if a module still requires section_purge, it is kept.
   if (\Drupal::moduleHandler()->moduleExists('section_purge')) {
-    $module_installer->uninstall(['section_purge']);
+    if (_tide_marina_enabled_dependents('section_purge', [])) {
+      \Drupal::logger('tide_marina')->warning('Tide Marina: section_purge kept because other modules still require it.');
+    }
+    else {
+      \Drupal::service('module_installer')->uninstall(['section_purge'], FALSE);
+    }
   }
 }
 
@@ -61,6 +79,120 @@ function tide_marina_update_10001() {
     \Drupal::service('module_installer')->install(['monolog']);
   }
   _tide_marina_log_monolog_enabled();
+}
+
+/**
+ * Uninstall the Lagoon and Bay platform modules that Marina does not use.
+ */
+function tide_marina_update_10002() {
+  return _tide_marina_uninstall_legacy_platform_modules();
+}
+
+/**
+ * Lagoon and Bay platform modules that are not used on Marina.
+ *
+ * The packages stay in the codebase until every site has run the clean-up:
+ * a module can only be uninstalled while its code is present.
+ */
+function _tide_marina_legacy_platform_modules(): array {
+  return [
+    'baywatch',
+    'bay_platform_dependencies',
+    'bay_monitoring',
+    'tide_logs',
+    'lagoon_logs',
+  ];
+}
+
+/**
+ * Uninstall the legacy platform modules that can be safely removed.
+ *
+ * Safe to run repeatedly. A module is kept, and the reason logged, when its
+ * code is missing, when a module outside the list still requires it, or when
+ * an uninstall validator rejects it. Keeping a module also keeps the modules
+ * it requires, so no installed module is ever left without a dependency.
+ *
+ * @return string
+ *   A summary of what was uninstalled and what was kept.
+ */
+function _tide_marina_uninstall_legacy_platform_modules(): string {
+  $logger = \Drupal::logger('tide_marina');
+  $module_handler = \Drupal::moduleHandler();
+  $module_list = \Drupal::service('extension.list.module');
+  $module_installer = \Drupal::service('module_installer');
+
+  $targets = array_values(array_filter(_tide_marina_legacy_platform_modules(), [$module_handler, 'moduleExists']));
+  if (!$targets) {
+    return 'Tide Marina: no legacy platform modules are installed.';
+  }
+
+  $kept = [];
+  foreach ($targets as $module) {
+    if (!$module_list->exists($module)) {
+      $kept[$module] = 'module code is missing';
+    }
+  }
+
+  // Keeping one module can block another, so repeat until nothing changes.
+  do {
+    $changed = FALSE;
+    $remaining = array_values(array_diff($targets, array_keys($kept)));
+    $reasons = $remaining ? $module_installer->validateUninstall($remaining) : [];
+    foreach ($remaining as $module) {
+      if ($dependents = _tide_marina_enabled_dependents($module, $remaining)) {
+        $kept[$module] = 'required by ' . implode(', ', $dependents);
+        $changed = TRUE;
+      }
+      elseif (!empty($reasons[$module])) {
+        $kept[$module] = implode('; ', array_map('strval', $reasons[$module]));
+        $changed = TRUE;
+      }
+    }
+  } while ($changed);
+
+  $remaining = array_values(array_diff($targets, array_keys($kept)));
+  if ($remaining) {
+    // Dependents were checked above; never let core add modules to the list.
+    $module_installer->uninstall($remaining, FALSE);
+  }
+
+  foreach ($kept as $module => $reason) {
+    $logger->warning('Tide Marina: kept @module: @reason.', [
+      '@module' => $module,
+      '@reason' => $reason,
+    ]);
+  }
+  $summary = sprintf('Tide Marina: uninstalled legacy platform modules: %s.', $remaining ? implode(', ', $remaining) : 'none');
+  if ($kept) {
+    $summary .= sprintf(' Kept: %s.', implode(', ', array_map(
+      static fn($module, $reason) => "$module ($reason)",
+      array_keys($kept),
+      $kept,
+    )));
+  }
+  $logger->notice($summary);
+  return $summary;
+}
+
+/**
+ * Lists installed modules that require a module, excluding some.
+ *
+ * @param string $module
+ *   The module being uninstalled.
+ * @param string[] $excluded
+ *   Modules that are being uninstalled together with it.
+ *
+ * @return string[]
+ *   Installed modules, directly or indirectly requiring $module, that are not
+ *   in $excluded.
+ */
+function _tide_marina_enabled_dependents(string $module, array $excluded): array {
+  $module_handler = \Drupal::moduleHandler();
+  $required_by = \Drupal::service('extension.list.module')->get($module)->required_by ?? [];
+  return array_values(array_filter(
+    array_keys($required_by),
+    static fn($dependent) => $module_handler->moduleExists($dependent) && !in_array($dependent, $excluded, TRUE),
+  ));
 }
 
 /**
