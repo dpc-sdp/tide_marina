@@ -139,3 +139,14 @@ function marina_cf_cachetags_uninstall() {
   }));
   $logger_config->set('channels', $channels)->save();
 }
+
+/**
+ * Process invalidations on cron instead of at the end of every request.
+ */
+function marina_cf_cachetags_update_10003() {
+  if (!\Drupal::moduleHandler()->moduleExists('purge_processor_cron')) {
+    \Drupal::service('module_installer')->install(['purge_processor_cron']);
+  }
+
+  marina_cf_cachetags_configure_purge();
+}
