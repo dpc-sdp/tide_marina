@@ -87,6 +87,23 @@ blacklist are dropped, entity tags are listed first, and the list is capped at
 the 50 tags CloudFront stores per object. Hashing keeps the header far below
 CloudFront's 1,783-character limit.
 
+**Allowed tags.** Only tags matching one of the
+`marina_cf_cachetags.allowed_tag_patterns` container parameter's patterns are
+sent in the header or queued for invalidation. The coretags queuer is replaced
+with one that applies the same filter, so a tag is only invalidated if it can
+appear on a cached object. The defaults keep:
+
+- entity tags for nodes, media, taxonomy terms, menu links, reusable
+  (library) paragraphs and redirects, e.g. `node:203`
+- list tags for nodes, media, taxonomy terms and menu links, e.g.
+  `node_list:landing_page`
+- config tags, except `config:views.view.admin_audit_trail`
+
+Everything else is dropped. That includes paragraph tags (saving a paragraph
+also saves its parent), revision tags, and bookkeeping tags such as
+`search_api_list:*` and `simple_sitemap:*`. Override the parameter in a site's
+`services.yml`; an empty list keeps every tag that is not blocklisted.
+
 **Invalidation.** The purger sends a `POST` to
 `http://localhost:8083/prod/cache-invalidation/{project}/{environment}` (the
 platform's SigV4 sidecar) with a JSON body of the same hashes, each prefixed

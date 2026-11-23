@@ -1,3 +1,17 @@
+parameters:
+  # A cache tag must match one of these patterns to be sent in the
+  # x-amz-meta-cache-tag header or queued for invalidation. Override in a
+  # site's services.yml; an empty list keeps every tag that is not blocklisted.
+  marina_cf_cachetags.allowed_tag_patterns:
+    # Entities an editor changes directly. Paragraphs are left out: saving one
+    # also saves its parent. paragraphs_library_item covers reusable ones.
+    - '/^(node|media|taxonomy_term|menu_link_content|paragraphs_library_item|redirect):\d+$/'
+    # List tags for the entity types the content API lists.
+    - '/^(node|media|taxonomy_term|menu_link_content)_list(:[a-z0-9_]+)?$/'
+    # Config, except the admin audit trail view, which is invalidated on every
+    # audited action and is never served to visitors.
+    - '/^config:(?!views\.view\.admin_audit_trail$)/'
+
 services:
   _defaults:
     autowire: true
@@ -8,6 +22,7 @@ services:
 
   marina_cf_cachetags.cache_tag_filter:
     class: Drupal\marina_cf_cachetags\DefaultCacheTagFilter
+    arguments: ['@config.factory', '%marina_cf_cachetags.allowed_tag_patterns%']
   Drupal\marina_cf_cachetags\CacheTagFilterInterface: '@marina_cf_cachetags.cache_tag_filter'
 
   marina_cf_cachetags.cache_tag_prioritizer:
