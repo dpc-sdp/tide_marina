@@ -10,10 +10,10 @@ namespace Drupal\marina_cf_cachetags;
 interface CacheTagFilterInterface {
 
   /**
-   * Filters cache tags before they are prioritised and hashed.
+   * Filters cache tags before they are queued, or prioritised and hashed.
    *
    * @param string[] $tags
-   *   The cache tags of the response.
+   *   The cache tags of the response, or the tags being invalidated.
    *
    * @return string[]
    *   The remaining cache tags, re-indexed.
