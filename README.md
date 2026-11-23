@@ -75,9 +75,15 @@ drush en marina_cf_cachetags
 ```
 
 On install it registers Purge's HTTP bundled purger (instance
-`marina_cf_cachetags`), enables the `coretags` queuer and the `lateruntime`
-processor, and empties the purge queue so nothing queued for a previous purger
-lingers.
+`marina_cf_cachetags`), enables the `coretags` queuer and the `cron`
+processor (disabling `lateruntime`), and empties the purge queue so nothing
+queued for a previous purger lingers.
+
+**Processing.** Invalidations are queued and sent by the `cron` processor, not
+at the end of the request that made the change. The platform's `drush cron
+purge` job calls `purge_processor_cron_cron()` every minute, so a minute of
+edits goes out as one request with duplicate tags removed. Sites without that
+job only purge on `drush cron`.
 
 **Response header.** Cacheable responses carry `x-amz-meta-cache-tag`, a
 comma-separated list of the response's Drupal cache tags hashed with xxHash3

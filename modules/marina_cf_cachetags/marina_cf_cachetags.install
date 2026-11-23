@@ -57,20 +57,25 @@ function marina_cf_cachetags_configure_purge() {
   }
   $config->set('queuers', $queuers);
 
-  // Process pending invalidations after the response has been sent.
+  // Process pending invalidations on cron rather than at the end of every
+  // request. The platform runs `purge_processor_cron_cron()` every minute, so
+  // a minute of changes goes out as one de-duplicated request, and a request
+  // that fails is retried once a minute rather than on every page view.
   $processors = $config->get('processors') ?? [];
-  $lateruntime_exists = FALSE;
+  $cron_exists = FALSE;
   foreach ($processors as &$processor) {
-    if (($processor['plugin_id'] ?? NULL) === 'lateruntime') {
+    if (($processor['plugin_id'] ?? NULL) === 'cron') {
       $processor['status'] = TRUE;
-      $lateruntime_exists = TRUE;
-      break;
+      $cron_exists = TRUE;
+    }
+    elseif (($processor['plugin_id'] ?? NULL) === 'lateruntime') {
+      $processor['status'] = FALSE;
     }
   }
   unset($processor);
-  if (empty($lateruntime_exists)) {
+  if (empty($cron_exists)) {
     $processors[] = [
-      'plugin_id' => 'lateruntime',
+      'plugin_id' => 'cron',
       'status' => TRUE,
     ];
   }
