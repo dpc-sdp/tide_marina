@@ -18,12 +18,13 @@ function marina_cf_cachetags_install() {
 function marina_cf_cachetags_configure_purge() {
   $config = \Drupal::configFactory()->getEditable('purge.plugins');
 
-  // Register the bundled HTTP purger so Purge sends tags to the sidecar.
+  // Register the purger that sends tags to the sidecar. It is the HTTP bundled
+  // purger with a cap on attempts, and uses the same instance settings.
   $purgers = $config->get('purgers') ?? [];
   $purger_exists = FALSE;
   foreach ($purgers as &$purger) {
     if (($purger['instance_id'] ?? NULL) === 'marina_cf_cachetags') {
-      $purger['plugin_id'] = 'httpbundled';
+      $purger['plugin_id'] = 'marina_cf_cachetags';
       $purger_exists = TRUE;
       break;
     }
@@ -33,7 +34,7 @@ function marina_cf_cachetags_configure_purge() {
     $purgers[] = [
       'order_index' => 3,
       'instance_id' => 'marina_cf_cachetags',
-      'plugin_id' => 'httpbundled',
+      'plugin_id' => 'marina_cf_cachetags',
     ];
   }
   $config->set('purgers', $purgers);
@@ -76,25 +77,13 @@ function marina_cf_cachetags_configure_purge() {
   }
   $config->set('processors', $processors)->save();
 
-  // Log failures from the HTTP bundled purger.
-  $logger_config = \Drupal::configFactory()
-    ->getEditable('purge.logger_channels');
-  $channels = $logger_config->get('channels') ?? [];
-  $channel_id = 'purger_httpbundled_marina_cf_cachetags';
-  $channel_exists = FALSE;
-  foreach ($channels as $channel) {
-    if (($channel['id'] ?? NULL) === $channel_id) {
-      $channel_exists = TRUE;
-      break;
-    }
-  }
-  if (empty($channel_exists)) {
-    $channels[] = [
-      'id' => $channel_id,
-      'grants' => [0, 2, 3],
-    ];
-    $logger_config->set('channels', $channels)->save();
-  }
+  // Log failures from the purger. The channel is named after the plugin, so
+  // replace the one used when the instance ran on the plain HTTP bundled
+  // purger. Use the logger service: it writes its own copy of the channels
+  // back to config when it is destroyed, which would undo a direct edit.
+  $purge_logger = \Drupal::service('purge.logger');
+  $purge_logger->deleteChannel('purger_httpbundled_marina_cf_cachetags');
+  $purge_logger->setChannel('purger_marina_cf_cachetags_marina_cf_cachetags', [0, 2, 3]);
 }
 
 /**
@@ -127,10 +116,7 @@ function marina_cf_cachetags_uninstall() {
 
   $config->set('purgers', $purgers)->save();
 
-  $logger_config = $config_factory->getEditable('purge.logger_channels');
-  $channels = $logger_config->get('channels') ?? [];
-  $channels = array_values(array_filter($channels, static function (array $channel) {
-    return ($channel['id'] ?? NULL) !== 'purger_httpbundled_marina_cf_cachetags';
-  }));
-  $logger_config->set('channels', $channels)->save();
+  $purge_logger = \Drupal::service('purge.logger');
+  $purge_logger->deleteChannel('purger_marina_cf_cachetags_marina_cf_cachetags');
+  $purge_logger->deleteChannel('purger_httpbundled_marina_cf_cachetags');
 }
