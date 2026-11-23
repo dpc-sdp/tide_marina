@@ -110,6 +110,16 @@ second timeout, so each retry can become another CloudFront invalidation. An
 invalidation is sent at most 3 times; after that it is dropped and an error
 is logged to the `purger_marina_cf_cachetags_marina_cf_cachetags` channel.
 
+**Stale items.** Items that never reach the purger, such as invalidation types
+it does not support or anything queued while Purge's diagnostics are failing,
+are not covered by that cap. On each `drush cron`, unclaimed queue items older
+than an hour are deleted and a warning is logged. Change the age (in seconds,
+0 disables it) in `settings.php`:
+
+```php
+$settings['marina_cf_cachetags_queue_max_age'] = 7200;
+```
+
 **Site configuration.** Override the purger's `path` with the deployment's
 project and environment names (the placeholders are not substituted
 anywhere else), e.g. in `settings.php`:

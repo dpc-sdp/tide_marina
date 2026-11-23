@@ -6,7 +6,9 @@
  */
 
 use Drupal\Core\Render\BubbleableMetadata;
+use Drupal\Core\Site\Settings;
 use Drupal\marina_cf_cachetags\InvalidationTokens;
+use Drupal\marina_cf_cachetags\QueueAgeLimit;
 
 /**
  * Implements hook_tokens_alter().
@@ -56,5 +58,33 @@ function marina_cf_cachetags_tokens_alter(array &$replacements, array $context, 
     if (isset(InvalidationTokens::SEPARATORS[$name])) {
       $replacements[$original] = implode(InvalidationTokens::SEPARATORS[$name], $expressions);
     }
+  }
+}
+
+/**
+ * Implements hook_cron().
+ *
+ * Removes purge queue items older than an hour (or
+ * `$settings['marina_cf_cachetags_queue_max_age']` seconds; 0 disables it).
+ * The purger's attempt cap only covers items that reach it, so this catches
+ * the rest.
+ *
+ * @see \Drupal\marina_cf_cachetags\QueueAgeLimit
+ */
+function marina_cf_cachetags_cron() {
+  $max_age = (int) Settings::get('marina_cf_cachetags_queue_max_age', QueueAgeLimit::DEFAULT_MAX_AGE);
+  $limit = new QueueAgeLimit(
+    \Drupal::database(),
+    \Drupal::service('purge.queue'),
+    \Drupal::service('purge.queue.stats'),
+    \Drupal::time(),
+    $max_age,
+  );
+  $removed = $limit->removeStaleItems();
+  if ($removed > 0) {
+    \Drupal::logger('marina_cf_cachetags')->warning('Removed @count purge queue items older than @age seconds.', [
+      '@count' => $removed,
+      '@age' => $max_age,
+    ]);
   }
 }
