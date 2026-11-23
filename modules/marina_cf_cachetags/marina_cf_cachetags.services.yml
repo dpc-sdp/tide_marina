@@ -13,3 +13,9 @@ services:
   marina_cf_cachetags.cache_tag_prioritizer:
     class: Drupal\marina_cf_cachetags\DefaultCacheTagPrioritizer
   Drupal\marina_cf_cachetags\CacheTagPrioritizerInterface: '@marina_cf_cachetags.cache_tag_prioritizer'
+
+  marina_cf_cachetags.throttled_lateruntime_processor:
+    class: Drupal\marina_cf_cachetags\EventSubscriber\ThrottledLateRuntimeProcessor
+    arguments: ['@service_container', '@state', '@lock', '@datetime.time', '@settings']
+    tags:
+      - { name: event_subscriber }

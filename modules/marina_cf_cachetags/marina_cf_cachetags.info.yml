@@ -6,7 +6,7 @@ core_version_requirement: ^10.2 || ^11
 dependencies:
   - tide_marina:tide_marina
   - purge:purge
-  - purge:purge_processor_lateruntime
+  - purge:purge_processor_cron
   - purge:purge_queuer_coretags
   - purge:purge_tokens
   - purge_purger_http:purge_purger_http

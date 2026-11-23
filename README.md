@@ -75,9 +75,20 @@ drush en marina_cf_cachetags
 ```
 
 On install it registers Purge's HTTP bundled purger (instance
-`marina_cf_cachetags`), enables the `coretags` queuer and the `lateruntime`
-processor, and empties the purge queue so nothing queued for a previous purger
-lingers.
+`marina_cf_cachetags`), enables the `coretags` queuer, the throttled late
+runtime processor and the `cron` processor (disabling Purge's `lateruntime`),
+and empties the purge queue so nothing queued for a previous purger lingers.
+
+**Processing.** The queue is sent at the end of a request, after the response,
+but at most once every 60 seconds across all requests. The first request after
+a quiet period sends straight away, so a single edit is not delayed; edits made
+during the interval go out together, with duplicate tags removed, at the end of
+the first request after it. On a site with no further traffic, `drush cron`
+sends what is left. Change the interval in `settings.php`:
+
+```php
+$settings['marina_cf_cachetags_processing_interval'] = 30;
+```
 
 **Response header.** Cacheable responses carry `x-amz-meta-cache-tag`, a
 comma-separated list of the response's Drupal cache tags hashed with xxHash3

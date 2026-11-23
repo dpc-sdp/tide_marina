@@ -57,22 +57,31 @@ function marina_cf_cachetags_configure_purge() {
   }
   $config->set('queuers', $queuers);
 
-  // Process pending invalidations after the response has been sent.
+  // Process pending invalidations after the response has been sent, at most
+  // once per interval, instead of Purge's lateruntime processor, which sends
+  // on every request. The cron processor picks up anything left on sites
+  // with no further traffic.
+  $enabled = [
+    'marina_cf_cachetags_lateruntime' => TRUE,
+    'cron' => TRUE,
+    'lateruntime' => FALSE,
+  ];
   $processors = $config->get('processors') ?? [];
-  $lateruntime_exists = FALSE;
   foreach ($processors as &$processor) {
-    if (($processor['plugin_id'] ?? NULL) === 'lateruntime') {
-      $processor['status'] = TRUE;
-      $lateruntime_exists = TRUE;
-      break;
+    $plugin_id = $processor['plugin_id'] ?? NULL;
+    if (isset($enabled[$plugin_id])) {
+      $processor['status'] = $enabled[$plugin_id];
+      unset($enabled[$plugin_id]);
     }
   }
   unset($processor);
-  if (empty($lateruntime_exists)) {
-    $processors[] = [
-      'plugin_id' => 'lateruntime',
-      'status' => TRUE,
-    ];
+  foreach ($enabled as $plugin_id => $status) {
+    if ($status) {
+      $processors[] = [
+        'plugin_id' => $plugin_id,
+        'status' => TRUE,
+      ];
+    }
   }
   $config->set('processors', $processors)->save();
 
@@ -133,4 +142,15 @@ function marina_cf_cachetags_uninstall() {
     return ($channel['id'] ?? NULL) !== 'purger_httpbundled_marina_cf_cachetags';
   }));
   $logger_config->set('channels', $channels)->save();
+}
+
+/**
+ * Process invalidations at most once a minute instead of on every request.
+ */
+function marina_cf_cachetags_update_10003() {
+  if (!\Drupal::moduleHandler()->moduleExists('purge_processor_cron')) {
+    \Drupal::service('module_installer')->install(['purge_processor_cron']);
+  }
+
+  marina_cf_cachetags_configure_purge();
 }
