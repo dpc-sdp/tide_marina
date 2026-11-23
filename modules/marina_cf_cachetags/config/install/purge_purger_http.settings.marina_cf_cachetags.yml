@@ -13,7 +13,7 @@ headers: { }
 body: '{"tagsCsv":"[invalidations:separated_comma]"}'
 body_content_type: application/json
 runtime_measurement: true
-timeout: 1.0
+timeout: 5.0
 connect_timeout: 1.0
 cooldown_time: 0.0
 max_requests: 100
