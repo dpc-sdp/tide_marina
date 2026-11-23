@@ -102,6 +102,19 @@ function marina_cf_cachetags_update_10001() {
 }
 
 /**
+ * Cap purge attempts and allow the invalidation API 5 seconds to respond.
+ */
+function marina_cf_cachetags_update_10002() {
+  marina_cf_cachetags_configure_purge();
+
+  $settings = \Drupal::configFactory()
+    ->getEditable('purge_purger_http.settings.marina_cf_cachetags');
+  if (!$settings->isNew() && (float) $settings->get('timeout') < 5.0) {
+    $settings->set('timeout', 5.0)->save();
+  }
+}
+
+/**
  * Implements hook_uninstall().
  */
 function marina_cf_cachetags_uninstall() {
